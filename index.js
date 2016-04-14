@@ -4,6 +4,9 @@ if (!process.env.TELEGRAM_API_TOKEN) {
   process.exit(1);
 }
 
+var Bankiru = require('./lib/bankiru');
+var banki = new Bankiru();
+
 var Telegram = require('./lib/telegram');
 
 var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
@@ -17,7 +20,12 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
   		this.send('pong');
   		break;
     case 'dollar':
-      // todo: get dollar exchange rate
+      banki.getUsdExchangeRate(function (err, usd) {
+        if (err) return console.error(err);
+        var msg = 'Buy for ' + usd.buy.rate + ' (' + usd.buy.description + ')' + 
+          ', sell for ' + usd.sell.rate + ' (' + usd.sell.description + ')';
+        this.send(msg);
+      });
       break;
     default:
       this.send('I\'m stupid.');
