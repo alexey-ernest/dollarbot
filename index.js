@@ -4,31 +4,34 @@ if (!process.env.TELEGRAM_API_TOKEN) {
   process.exit(1);
 }
 
+var Telegram = require('./lib/telegram');
 var Bankiru = require('./lib/bankiru');
 var banki = new Bankiru();
-
-var Telegram = require('./lib/telegram');
+var city = require('./lib/city.js');
 
 var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
 .on('update', function (update) {
   var message = update.message.text;
+  if (message[0] == '/') {
+    message = message.substring(1);
+  }
+
   var params = message.split(/\s/);
   var command = params.shift().toLowerCase();
 
-  switch (command) {
-  	case 'ping': 
-  		this.send('pong');
-  		break;
-    case 'dollar':
-      banki.getUsdExchangeRate(function (err, usd) {
-        if (err) return console.error(err);
-        var msg = 'Buy for ' + usd.buy.rate + ' (' + usd.buy.description + ')' + 
-          ', sell for ' + usd.sell.rate + ' (' + usd.sell.description + ')';
-        this.send(msg);
-      });
-      break;
-    default:
-      this.send('I\'m stupid.');
+  if (command === 'start') {
+    this.send('Введите город, чтобы узнать лучший курс. Например, Москва', update.message.from.id);
+  } else if (city.exists(command)) {
+    var cityCode = city.getCode(command);
+    var telegram = this;
+    banki.getUsdExchangeRate(cityCode, function (err, usd) {
+      if (err) return console.error(err);
+      var msg = 'Покупка за ' + usd.buy.rate + ' (' + usd.buy.description + ')' + 
+        ', продажа за ' + usd.sell.rate + ' (' + usd.sell.description + ')';
+      telegram.send(msg, update.message.from.id);
+    });
+  } else {
+    this.send('Не понял.', update.message.from.id);
   }
 })
 .listen();
