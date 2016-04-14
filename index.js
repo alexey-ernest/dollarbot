@@ -26,8 +26,8 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
     var telegram = this;
     banki.getUsdExchangeRate(cityCode, function (err, usd) {
       if (err) return console.error(err);
-      var msg = 'Покупка за ' + usd.buy.rate + ' (' + usd.buy.description + ')' + 
-        ', продажа за ' + usd.sell.rate + ' (' + usd.sell.description + ')';
+      var msg = 'Купят за ' + usd.buy.rate + 'р. (' + usd.buy.description + ')' + 
+        ', продадут за ' + usd.sell.rate + 'р. (' + usd.sell.description + ')';
       telegram.send(msg, update.message.from.id);
     });
   } else {
