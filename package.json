@@ -1,0 +1,26 @@
+{
+  "name": "dollarbot",
+  "version": "0.0.1",
+  "description": "Telegram bot for dollar best exchange rate in your city",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexey-ernest/dollarbot.git"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "dollar",
+    "exchange",
+    "rate"
+  ],
+  "author": "Alexey Melnikov",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/alexey-ernest/dollarbot/issues"
+  },
+  "homepage": "https://github.com/alexey-ernest/dollarbot#readme"
+}
