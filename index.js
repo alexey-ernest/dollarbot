@@ -45,7 +45,7 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
       telegram.send(msg, chatId, isInline);
     });
   } else {
-    this.send('Не понял.', chatId, isInline);
+    this.send('Укажите город...', chatId, isInline);
   }
 })
 .listen();
