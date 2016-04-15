@@ -11,7 +11,17 @@ var city = require('./lib/city.js');
 
 var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
 .on('update', function (update) {
-  var message = update.message.text;
+  // parse message
+  var message, chatId, isInline;
+  if (update.message) {
+    message = update.message.text;
+    chatId = update.message.from.id;
+  } else if (update.inline_query) {
+    message = update.inline_query.query;
+    chatId = update.inline_query.id;
+    isInline = true;
+  }
+
   if (message[0] == '/') {
     message = message.substring(1);
   }
@@ -28,10 +38,14 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
       if (err) return console.error(err);
       var msg = 'Купят за ' + usd.buy.rate + 'р. (' + usd.buy.description + ')' + 
         ', продадут за ' + usd.sell.rate + 'р. (' + usd.sell.description + ')';
-      telegram.send(msg, update.message.from.id);
+
+      if (isInline) {
+        msg = command.charAt(0).toUpperCase() + command.slice(1) + '. ' + msg;
+      }
+      telegram.send(msg, chatId, isInline);
     });
   } else {
-    this.send('Не понял.', update.message.from.id);
+    this.send('Не понял.', chatId, isInline);
   }
 })
 .listen();
