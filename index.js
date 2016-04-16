@@ -48,44 +48,6 @@ function getUsdRates(cityCode, fn) {
   });
 }
 
-/**
- * Builds message with best sell rates in the city.
- *
- * @method     buildSellMessage
- * @param      {string}    cityName  The name of the city to find best rates.
- * @param      {Function}  fn        Callback function.
- */
-function buildSellMessage(cityName, fn) {
-  var cityCode = city.getCode(cityName);
-
-  getUsdRates(cityCode, function (err, rates) {
-    if (err) return fn(err);
-    var city = cityName.charAt(0).toUpperCase() + cityName.slice(1);
-    var msg = 'Курс ЦБ - ' + rates.cbr + 'р за 1 доллар. ' + 
-      'Дороже всего вы можете продать за ' + rates.exchange.buy.rate + 'р (' + city + ', ' + rates.exchange.buy.description + ')';
-    fn(null, msg);
-  });
-}
-
-/**
- * Builds message with best buy rates in the city.
- *
- * @method     buildBuyMessage
- * @param      {string}    cityName  The name of the city to find best rates.
- * @param      {Function}  fn        Callback function.
- */
-function buildBuyMessage(cityName, fn) {
-  var cityCode = city.getCode(cityName);
-
-  getUsdRates(cityCode, function (err, rates) {
-    if (err) return fn(err);
-    var city = cityName.charAt(0).toUpperCase() + cityName.slice(1);
-    var msg = 'Курс ЦБ - ' + rates.cbr + 'р за 1 доллар. ' + 
-      'Дешевле всего вы можете купить доллар за ' + rates.exchange.sell.rate + 'р (' + city + ', ' + rates.exchange.sell.description + ')';
-    fn(null, msg);
-  });
-}
-
 var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
 .on('update', function (update) {
   // parse message
@@ -109,8 +71,7 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
     command = params.shift().toLowerCase();
   }
 
-  function sendMessage(err, msg) {
-    if (err) return console.error(err);
+  function sendMessage(msg) {
     if (isInline) {
       telegram.sendArticleInline(msg, msg, chatId);
     } else {
@@ -131,13 +92,37 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
       param = command;
     }
 
-    if (param === 'купить') {
-      buildBuyMessage(cityName, function (err, msg) {
-        sendMessage(err, msg);
-      });
-    } else if (param === 'продать') {
-      buildSellMessage(cityName, function (err, msg) {
-        sendMessage(err, msg);
+    var cityInfo = city.get(cityName);
+    cityName = cityName.charAt(0).toUpperCase() + cityName.slice(1);
+    if (param === 'купить' || param === 'продать') {
+      // get USD best rates
+      getUsdRates(cityInfo.code, function (err, rates) {
+        if (err) return console.error(err);
+
+        // build sell or buy message
+        var bankId, msg = 'Курс ЦБ - ' + rates.cbr + 'р за 1 доллар. ';
+        if (param === 'купить') {
+          bankId = rates.exchange.sell.bank_id;
+          msg += 'Дешевле всего вы можете купить доллар в ' + rates.exchange.sell.description + ' (г. ' + cityName + ') за ' + rates.exchange.sell.rate + 'р';
+        } else {
+          bankId = rates.exchange.buy.bank_id;
+          msg += 'Дороже всего вы можете продать доллар в ' + rates.exchange.buy.description + ' (г. ' + cityName + ') за ' + rates.exchange.buy.rate + 'р';
+        }
+        
+        sendMessage(msg);
+
+        // getting list of bank branches
+        banki.findBranchesInRegion(cityInfo.id, bankId, function (err, branches) {
+          if (err) return console.error(err);
+          var i;
+          // sending locations to the branches
+          for (i = 0; i < branches.length; ++i) {
+            var b = branches[i];
+            var branchName = b.name.replace(/(&[#\d\w]+;)/g, '');
+            var branchAddress = b.address.replace(/(\d{6,6},[^,]+, )/, ''); // remove zip code and city name
+            telegram.sendVenue(branchName, branchAddress, b.latitude, b.longitude, chatId);
+          }
+        });
       });
     } else {
       // ask for action: sell/buy
@@ -151,7 +136,8 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
       return this.send('Купить или продать USD?', chatId, keyboard);
     }
   } else {
-    sendMessage(null, 'Укажите город...');
+    // city is not specified
+    sendMessage('Укажите город...');
   }
 })
 .listen();
