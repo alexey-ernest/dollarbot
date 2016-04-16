@@ -25,12 +25,15 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
     isInline = true;
   }
 
-  if (message[0] == '/') {
+  if (message && message[0] == '/') {
     message = message.substring(1);
   }
 
-  var params = message.split(/\s/);
-  var command = params.shift().toLowerCase();
+  var command, params;
+  if (message) {
+    params = message.split(/\s/);
+    command = params.shift().toLowerCase();
+  }
 
   if (command === 'start') {
     this.send('Введите город, чтобы узнать лучший курс. Например, Москва', update.message.from.id);
