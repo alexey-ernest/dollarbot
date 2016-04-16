@@ -143,12 +143,12 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
       // ask for action: sell/buy
       var keyboard = {
         keyboard: [[
-          {text: 'Купить USD'}, {text: 'Продать USD'}
+          {text: 'Купить'}, {text: 'Продать'}
         ]],
         one_time_keyboard: true
       };
 
-      return this.send('Купить или продать?', chatId, keyboard);
+      return this.send('Купить или продать USD?', chatId, keyboard);
     }
   } else {
     sendMessage(null, 'Укажите город...');
