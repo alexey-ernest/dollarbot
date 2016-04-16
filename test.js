@@ -1,7 +1,7 @@
-var Bankiru = require('./lib/bankiru');
+var Cbr = require('./lib/cbr');
 
-var b = new Bankiru();
-b.getUsdExchangeRate('Tomsk', function (err, usd) {
+var c = new Cbr();
+c.getUsdRate(function (err, rate) {
   if (err) return console.error(err);
-  console.log(usd);
+  console.log(rate);
 });
