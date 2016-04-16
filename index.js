@@ -55,7 +55,7 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
           callback(null, rate);
         });
       }
-    ], function(err, results){
+    ], function(err, results) {
       if (err) return console.error(err);
       
       var usdExchange = results[0];
@@ -65,10 +65,18 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
         'Дешевле всего вы можете купить доллар за ' + usdExchange.sell.rate + 'р (' + city + ', ' + usdExchange.sell.description + ')' + 
         ', дороже всего вы можете продать за ' + usdExchange.buy.rate + 'р (' + city + ', ' + usdExchange.buy.description + ')';
 
-      telegram.send(msg, chatId, isInline);
+      if (isInline) {
+        telegram.sendArticleInline(msg, msg, chatId);
+      } else {
+        telegram.send(msg, chatId);
+      }
     });
   } else {
-    this.send('Укажите город...', chatId, isInline);
+    if (isInline) {
+      this.sendArticleInline('Укажите город...', 'Укажите город...', chatId);
+    } else {
+      this.send('Укажите город...', chatId);
+    }
   }
 })
 .listen();
