@@ -70,11 +70,11 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
-  function sendMessage(msg) {
+  function sendMessage(msg, fn) {
     if (isInline) {
-      telegram.sendArticleInline(msg, msg, chatId);
+      telegram.sendArticleInline(msg, msg, chatId, fn);
     } else {
-      telegram.send(msg, chatId);
+      telegram.send(msg, chatId, fn);
     }
   }
 
@@ -119,9 +119,16 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
             cityName: cityName
           });
         } else {
+          // updating user city
+          if (typeof user.save !== 'function') {
+            // fix for old data
+            delete user.save;
+          }
+
           user.cityName = cityName;  
         }
         
+        // saving in db
         user.save(function (err) {
           if (err) handleError(err);
         });
@@ -151,26 +158,37 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
             msg += 'Дороже всего вы можете продать доллар в ' + rates.exchange.buy.description + ' (г. ' + capitalize(cityName) + ') за ' + rates.exchange.buy.rate + 'р';
           }
           
+          // sending best rates message
           sendMessage(msg);
 
           // sending status that we're searching for branches
           telegram.sendChatAction(chatId, 'find_location');
-          sendMessage('Ищем офисы в вашем городе...');
+          setTimeout(function () {
+            sendMessage('Ищем офисы в вашем городе...');
+          }, 1000);
 
           // getting list of bank branches
           banki.findBranchesInRegion(cityInfo.id, bankId, function (err, branches) {
             if (err) return handleError(err);
-            
-            // sending locations to the branches
-            setTimeout(function (branches, telegram) {
-              var i;
-              for (i = 0; i < branches.length; ++i) {
-                var b = branches[i];
-                var branchName = b.name.replace(/(&[#\d\w]+;)/g, '');
-                var branchAddress = b.address.replace(/(\d{6,6},[^,]+, )/, ''); // remove zip code and city name
-                telegram.sendVenue(branchName, branchAddress, b.latitude, b.longitude, chatId);
-              }
-            }, 5000, branches, telegram);
+            var ids = [];
+            branches.forEach(function (b) {
+              ids.push(b.id);
+            });
+
+            // getting additional info for branches
+            banki.getBankObjectsData(ids, function (err, data) {
+              // sending locations to the branches
+              setTimeout(function (branches, telegram) {
+                var i;
+                for (i = 0; i < branches.length; ++i) {
+                  var b = branches[i];
+                  var branchName = b.name.replace(/(&[#\d\w]+;)/g, '');
+                  var title = branchName + ', т. ' + b.phone;
+                  var branchAddress = b.address.replace(/(\d{6,6},[^,]+, )/, ''); // remove zip code and city name
+                  telegram.sendVenue(title, branchAddress, b.latitude, b.longitude, chatId);
+                }
+              }, 5000, data, telegram);
+            });
           });
         });
       } else {
