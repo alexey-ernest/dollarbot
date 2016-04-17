@@ -78,6 +78,47 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
     }
   }
 
+  function appendBranchCalls(branch, calls) {
+    var branchName = branch.name.replace(/(&[#\d\w]+;)/g, '');
+    var branchAddress = branch.address.replace(/(\d{6,6},[^,]+, )/, ''); // remove zip code and city name
+    var branchPhones = branch.phone.replace(/\(/g, '+7 (');
+
+    calls.push(function (callback) {
+      var message = '<b>' + branchName + '</b>\n' + 
+        'т. ' + branchPhones  + '\n';
+      
+      telegram.send(message, chatId, {parse_mode: 'HTML'}, function (err) {
+        if (err) return callback(err);
+        callback(null);
+      });
+    });
+
+    // send branch location
+    calls.push(function (callback) {
+      telegram.sendVenue(undefined, branchAddress, branch.latitude, branch.longitude, chatId, function (err) {
+        if (err) return callback(err);
+        callback(null);
+      });
+    });
+  }
+
+  function sendBranchMessages(branches, fn) {
+    var apiCalls = [];
+    var i;
+    for (i = 0; i < branches.length; ++i) {
+      // send branch description
+      appendBranchCalls(branches[i], apiCalls);
+    }
+
+    // executing serially
+    async.series(
+      apiCalls,
+      function (err, results) {
+        if (err) return fn(err);
+        fn(null);
+      });
+  }
+
   function handleError(err) {
     return console.error(err);
   }
@@ -177,21 +218,11 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
 
             // getting additional info for branches
             banki.getBankObjectsData(ids, function (err, data) {
-              // sending locations to the branches
+              // sending branches
               setTimeout(function (branches, telegram) {
-                var i;
-                for (i = 0; i < branches.length; ++i) {
-                  var b = branches[i];
-                  var branchName = b.name.replace(/(&[#\d\w]+;)/g, '');
-                  var branchAddress = b.address.replace(/(\d{6,6},[^,]+, )/, ''); // remove zip code and city name
-                  var branchPhones = b.phone.replace(/\(/g, '+7 (');
-                  var message = '<b>' + branchName + '</b>\n' + 
-                    'т. ' + branchPhones  + '\n' + 
-                    '<a href="https://maps.google.com/maps?daddr=' + b.latitude + ',' + b.longitude + '">' + branchAddress + '</a>';
-                  
-                  telegram.send(message, chatId, {parse_mode: 'HTML'});
-                  //telegram.sendVenue(title, branchAddress, b.latitude, b.longitude, chatId);
-                }
+                sendBranchMessages(branches, function (err) {
+                  if (err) return handleError(err);
+                });
               }, 5000, data, telegram);
             });
           });
