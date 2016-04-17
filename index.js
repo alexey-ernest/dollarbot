@@ -90,7 +90,7 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
       one_time_keyboard: true
     };
 
-    return telegram.send('Купить или продать USD в г. ' + capitalize(cityName) + '?', chatId, keyboard);
+    return telegram.send('Купить или продать USD в г. ' + capitalize(cityName) + '?', chatId, {reply_markup: keyboard});
   }
 
   var telegram = this;
@@ -183,9 +183,14 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
                 for (i = 0; i < branches.length; ++i) {
                   var b = branches[i];
                   var branchName = b.name.replace(/(&[#\d\w]+;)/g, '');
-                  var title = branchName + ', т. ' + b.phone;
                   var branchAddress = b.address.replace(/(\d{6,6},[^,]+, )/, ''); // remove zip code and city name
-                  telegram.sendVenue(title, branchAddress, b.latitude, b.longitude, chatId);
+                  var branchPhones = b.phone.replace(/\(/g, '+7 (');
+                  var message = '<b>' + branchName + '</b>\n' + 
+                    'т. ' + branchPhones  + '\n' + 
+                    '<a href="https://maps.google.com/maps?daddr=' + b.latitude + ',' + b.longitude + '">' + branchAddress + '</a>';
+                  
+                  telegram.send(message, chatId, {parse_mode: 'HTML'});
+                  //telegram.sendVenue(title, branchAddress, b.latitude, b.longitude, chatId);
                 }
               }, 5000, data, telegram);
             });
