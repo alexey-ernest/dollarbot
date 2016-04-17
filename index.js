@@ -78,13 +78,13 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
     }
   }
 
-  function appendBranchCalls(branch, calls) {
+  function appendBranchCalls(branch, i, calls) {
     var branchName = branch.name.replace(/(&[#\d\w]+;)/g, '');
     var branchAddress = branch.address.replace(/(\d{6,6},[^,]+, )/, ''); // remove zip code and city name
     var branchPhones = branch.phone.replace(/\(/g, '+7 (');
 
     calls.push(function (callback) {
-      var message = '<b>' + branchName + '</b>\n' + 
+      var message = '<b>' + (i + 1) + '. ' + branchName + '</b>\n' + 
         'т. ' + branchPhones  + '\n';
       
       telegram.send(message, chatId, {parse_mode: 'HTML'}, function (err) {
@@ -107,7 +107,7 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
     var i;
     for (i = 0; i < branches.length; ++i) {
       // send branch description
-      appendBranchCalls(branches[i], apiCalls);
+      appendBranchCalls(branches[i], i, apiCalls);
     }
 
     // executing serially
