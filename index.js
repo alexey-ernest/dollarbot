@@ -11,14 +11,7 @@ var banki = new Bankiru();
 var Cbr = require('./lib/cbr');
 var cbr = new Cbr();
 var city = require('./lib/city.js');
-
-/**
- * ChatId:city cache.
- *
- * @type       {Object}
- */
-var cityCache = {
-};
+var User = require('./lib/user.js');
 
 /**
  * Gets the best buy and sell rates together with cb rate.
@@ -61,6 +54,7 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
     isInline = true;
   }
 
+  // trim slash
   if (message && message[0] == '/') {
     message = message.substring(1);
   }
@@ -71,6 +65,11 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
     command = params.shift().toLowerCase();
   }
 
+  function capitalize(str) {
+    if (!str) return str;
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
   function sendMessage(msg) {
     if (isInline) {
       telegram.sendArticleInline(msg, msg, chatId);
@@ -79,65 +78,99 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
     }
   }
 
+  function handleError(err) {
+    return console.error(err);
+  }
+
+  function showSellBuyKeyboard(cityName) {
+    var keyboard = {
+      keyboard: [[
+        {text: 'Купить'}, {text: 'Продать'}
+      ]],
+      one_time_keyboard: true
+    };
+
+    return telegram.send('Купить или продать USD в г. ' + capitalize(cityName) + '?', chatId, keyboard);
+  }
+
   var telegram = this;
-  if (command === 'start') {
-    this.send('Введите город, чтобы узнать лучший курс. Например, Москва', chatId);
-  } else if (cityCache[chatId] || city.exists(command)) {
-    var cityName, param;
-    if (city.exists(command)) {
-      cityName = cityCache[chatId] = command;
-      param = params.length > 0 ? params.shift().toLowerCase() : null;
-    } else if (cityCache[chatId]) {
-      cityName = cityCache[chatId];
-      param = command;
-    }
 
-    var cityInfo = city.get(cityName);
-    cityName = cityName.charAt(0).toUpperCase() + cityName.slice(1);
-    if (param === 'купить' || param === 'продать') {
-      // get USD best rates
-      getUsdRates(cityInfo.code, function (err, rates) {
-        if (err) return console.error(err);
+  // trying to get user settings from db
+  var user = User.get(chatId, function (err, user) {
+    if (err) return handleError(err);
 
-        // build sell or buy message
-        var bankId, msg = 'Курс ЦБ - ' + rates.cbr + 'р за 1 доллар. ';
-        if (param === 'купить') {
-          bankId = rates.exchange.sell.bank_id;
-          msg += 'Дешевле всего вы можете купить доллар в ' + rates.exchange.sell.description + ' (г. ' + cityName + ') за ' + rates.exchange.sell.rate + 'р';
+    // paring user command
+    if (command === 'start') {
+      if (!user) {
+        telegram.send('Введите город, чтобы узнать лучший курс. Например, Москва', chatId);
+      } else {
+        showSellBuyKeyboard(user.cityName);
+      }
+    } else if (user || city.exists(command)) {
+      // parsing inputs
+      var cityName, param;
+      if (city.exists(command)) {
+        cityName = command;
+
+        // caching user settings
+        if (!user) {
+          user = new User({
+            id: chatId,
+            cityName: cityName
+          });
         } else {
-          bankId = rates.exchange.buy.bank_id;
-          msg += 'Дороже всего вы можете продать доллар в ' + rates.exchange.buy.description + ' (г. ' + cityName + ') за ' + rates.exchange.buy.rate + 'р';
+          user.cityName = cityName;  
         }
         
-        sendMessage(msg);
-
-        // getting list of bank branches
-        banki.findBranchesInRegion(cityInfo.id, bankId, function (err, branches) {
-          if (err) return console.error(err);
-          var i;
-          // sending locations to the branches
-          for (i = 0; i < branches.length; ++i) {
-            var b = branches[i];
-            var branchName = b.name.replace(/(&[#\d\w]+;)/g, '');
-            var branchAddress = b.address.replace(/(\d{6,6},[^,]+, )/, ''); // remove zip code and city name
-            telegram.sendVenue(branchName, branchAddress, b.latitude, b.longitude, chatId);
-          }
+        user.save(function (err) {
+          if (err) handleError(err);
         });
-      });
-    } else {
-      // ask for action: sell/buy
-      var keyboard = {
-        keyboard: [[
-          {text: 'Купить'}, {text: 'Продать'}
-        ]],
-        one_time_keyboard: true
-      };
 
-      return this.send('Купить или продать USD?', chatId, keyboard);
+        param = params.length > 0 ? params.shift().toLowerCase() : null;
+      } else if (user.cityName) {
+        cityName = user.cityName;
+        param = command;
+      }
+
+      var cityInfo = city.get(cityName);
+      if (param === 'купить' || param === 'продать') {
+        // get USD best rates
+        getUsdRates(cityInfo.code, function (err, rates) {
+          if (err) return handleError(err);
+
+          // build sell or buy message
+          var bankId, msg = 'Курс ЦБ - ' + rates.cbr + 'р за 1 доллар. ';
+          if (param === 'купить') {
+            bankId = rates.exchange.sell.bank_id;
+            msg += 'Дешевле всего вы можете купить доллар в ' + rates.exchange.sell.description + ' (г. ' + capitalize(cityName) + ') за ' + rates.exchange.sell.rate + 'р';
+          } else {
+            bankId = rates.exchange.buy.bank_id;
+            msg += 'Дороже всего вы можете продать доллар в ' + rates.exchange.buy.description + ' (г. ' + capitalize(cityName) + ') за ' + rates.exchange.buy.rate + 'р';
+          }
+          
+          sendMessage(msg);
+
+          // getting list of bank branches
+          banki.findBranchesInRegion(cityInfo.id, bankId, function (err, branches) {
+            if (err) return handleError(err);
+            var i;
+            // sending locations to the branches
+            for (i = 0; i < branches.length; ++i) {
+              var b = branches[i];
+              var branchName = b.name.replace(/(&[#\d\w]+;)/g, '');
+              var branchAddress = b.address.replace(/(\d{6,6},[^,]+, )/, ''); // remove zip code and city name
+              telegram.sendVenue(branchName, branchAddress, b.latitude, b.longitude, chatId);
+            }
+          });
+        });
+      } else {
+        // ask for action: sell/buy
+        return showSellBuyKeyboard(cityName);
+      }
+    } else {
+      // city is not specified
+      sendMessage('Укажите город...');
     }
-  } else {
-    // city is not specified
-    sendMessage('Укажите город...');
-  }
+  });
 })
 .listen();
