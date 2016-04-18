@@ -85,7 +85,8 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
 
     calls.push(function (callback) {
       var message = '<b>' + (i + 1) + '. ' + branchName + '</b>\n' + 
-        'т. ' + branchPhones  + '\n';
+        'т. ' + branchPhones  + '\n' +
+        branchAddress;
       
       telegram.send(message, chatId, {parse_mode: 'HTML'}, function (err) {
         if (err) return callback(err);
