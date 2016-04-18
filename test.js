@@ -1,7 +1,7 @@
-var Banki = require('./lib/bankiru');
+var Micex = require('micex.api');
 
-var b = new Banki();
-b.getUsdExchangeRate('Tomsk', function (err, usd) {
-  if (err) return console.error(err);
-  console.log(usd);
-});
+Micex.securityMarketdata('USD000UTSTOM')
+  .then(function (security) {
+     console.log(security.node.last); // e.g. 64.04 
+     console.log(security);
+  });

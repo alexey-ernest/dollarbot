@@ -12,6 +12,7 @@ var Cbr = require('./lib/cbr');
 var cbr = new Cbr();
 var city = require('./lib/city.js');
 var User = require('./lib/user.js');
+var Micex = require('micex.api');
 
 /**
  * Gets the best buy and sell rates together with cb rate.
@@ -34,10 +35,18 @@ function getUsdRates(cityCode, fn) {
         if (err) return callback(err);
         callback(null, rate);
       });
+    },
+    function(callback) {
+      Micex.securityMarketdata('USD000UTSTOM')
+        .then(function (security) {
+          callback(null, security.node.last);
+        }, function (err) {
+          callback(err);
+        });
     }
   ], function(err, results) {
     if (err) return fn(err);
-    fn(null, {cbr: results[1], exchange: results[0]});
+    fn(null, {cbr: results[1], exchange: results[0], micex: results[2]});
   });
 }
 
@@ -84,9 +93,11 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
     var branchPhones = branch.phone.replace(/\(/g, '+7 (');
 
     calls.push(function (callback) {
-      var message = '<b>' + (i + 1) + '. ' + branchName + '</b>\n' + 
-        'т. ' + branchPhones  + '\n' +
-        branchAddress;
+      var message = '<b>' + (i + 1) + '. ' + branchName + '</b>\n';
+      if (branchPhones) {
+        message += 'т. ' + branchPhones  + '\n';
+      } 
+      message += branchAddress;
       
       telegram.send(message, chatId, {parse_mode: 'HTML'}, function (err) {
         if (err) return callback(err);
@@ -191,7 +202,7 @@ var telegram = new Telegram(process.env.TELEGRAM_API_TOKEN)
           if (err) return handleError(err);
 
           // build sell or buy message
-          var bankId, msg = 'Курс ЦБ - ' + rates.cbr + 'р за 1 доллар. ';
+          var bankId, msg = 'Курс ЦБ - ' + rates.cbr + 'р (' + rates.micex +' на Московской Бирже) за 1 доллар. ';
           if (param === 'купить') {
             bankId = rates.exchange.sell.bank_id;
             msg += 'Дешевле всего вы можете купить доллар в ' + rates.exchange.sell.description + ' (г. ' + capitalize(cityName) + ') за ' + rates.exchange.sell.rate + 'р';
